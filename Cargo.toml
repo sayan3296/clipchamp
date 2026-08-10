@@ -17,12 +17,17 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 bytes = "1"
 anyhow = "1"
 dirs = "6"
 futures = "0.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 hostname = "0.4"
+tray-icon = { version = "0.19", optional = true }
+muda = { version = "0.15", optional = true }
+gtk = { version = "0.18", optional = true }
+open = { version = "5", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 wayland-clipboard-listener = "0.1"
@@ -42,3 +47,4 @@ rustls-pemfile = { version = "2", optional = true }
 [features]
 default = []
 tls = ["rustls", "tokio-rustls", "rcgen", "rustls-pemfile"]
+gui = ["tray-icon", "muda", "gtk", "open"]

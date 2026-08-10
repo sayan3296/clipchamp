@@ -16,6 +16,8 @@ pub struct Config {
     pub clipboard: ClipboardConfig,
     #[serde(default = "ProtocolConfig::default")]
     pub protocol: ProtocolConfig,
+    #[serde(default = "LoggingConfig::default")]
+    pub logging: LoggingConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +68,14 @@ pub struct ProtocolConfig {
     pub max_frame_size_mb: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingConfig {
+    #[serde(default = "default_log_file")]
+    pub file: Option<PathBuf>,
+    #[serde(default = "default_log_level")]
+    pub level: String,
+}
+
 fn default_bind() -> String {
     "0.0.0.0:9090".to_string()
 }
@@ -86,6 +96,12 @@ fn default_poll_interval_ms() -> u64 {
 }
 fn default_max_frame_size_mb() -> usize {
     16
+}
+fn default_log_file() -> Option<PathBuf> {
+    Some(PathBuf::from("/var/log/clipchamp/clipchamp.log"))
+}
+fn default_log_level() -> String {
+    "info".to_string()
 }
 
 impl Default for ServerConfig {
@@ -131,6 +147,15 @@ impl Default for ProtocolConfig {
     }
 }
 
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            file: default_log_file(),
+            level: default_log_level(),
+        }
+    }
+}
+
 impl Config {
     pub fn config_path() -> PathBuf {
         dirs::config_dir()
@@ -154,6 +179,14 @@ impl Config {
                 self.protocol.max_frame_size_mb,
             );
         }
+        let valid_levels = ["trace", "debug", "info", "warn", "error"];
+        if !valid_levels.contains(&self.logging.level.to_lowercase().as_str()) {
+            tracing::warn!(
+                "logging.level '{}' is not valid (expected one of: {}); falling back to 'info'",
+                self.logging.level,
+                valid_levels.join(", "),
+            );
+        }
     }
 
     pub fn load() -> anyhow::Result<Self> {
@@ -174,7 +207,6 @@ impl Config {
             tracing::info!("wrote default config to {}", path.display());
             config
         };
-        config.validate();
         Ok(config)
     }
 }
@@ -188,6 +220,7 @@ impl Default for Config {
             history: HistoryConfig::default(),
             clipboard: ClipboardConfig::default(),
             protocol: ProtocolConfig::default(),
+            logging: LoggingConfig::default(),
         }
     }
 }
