@@ -2,6 +2,8 @@
 name = "clipchamp"
 version = "0.1.0"
 edition = "2024"
+description = "Cross-platform network clipboard sync"
+license = "MIT"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -48,3 +50,14 @@ rustls-pemfile = { version = "2", optional = true }
 default = []
 tls = ["rustls", "tokio-rustls", "rcgen", "rustls-pemfile"]
 gui = ["tray-icon", "muda", "gtk", "open"]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/clipchamp", dest = "/usr/bin/clipchamp", mode = "755" },
+    { source = "assets/icon.png", dest = "/usr/share/pixmaps/clipchamp.png", mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/licenses/clipchamp/LICENSE", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+gtk3 = "*"
+wl-clipboard = "*"

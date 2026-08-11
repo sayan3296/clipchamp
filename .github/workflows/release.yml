@@ -1,0 +1,271 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-release:
+    name: Check if release needed
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      version: ${{ steps.decide.outputs.version }}
+      tag: ${{ steps.decide.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide whether to release
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Default to no release
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
+
+          # Check commit message
+          MSG=$(git log -1 --pretty=%s)
+          if [[ "$MSG" != "Release the newest version" ]]; then
+            echo "Commit message does not match release trigger. Skipping."
+            exit 0
+          fi
+
+          # Read and validate VERSION
+          if [[ ! -f VERSION ]]; then
+            echo "::error::VERSION file not found"
+            exit 0
+          fi
+
+          VERSION=$(tr -d '[:space:]' < VERSION)
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::VERSION '$VERSION' does not match x.y or x.y.z format"
+            exit 0
+          fi
+
+          TAG="v${VERSION}"
+          echo "Version: $VERSION, Tag: $TAG"
+
+          # Check if this tag already exists as a release
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping."
+            exit 0
+          fi
+
+          echo "New release $TAG will be created."
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    name: Build Linux (x86_64, RPM)
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libxdo-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Sync VERSION to Cargo.toml
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          echo "Cargo.toml version set to $VERSION"
+          head -5 Cargo.toml
+
+      - name: Build release binary
+        run: cargo build --release --features gui
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm
+
+      - name: Generate RPM
+        run: |
+          cargo generate-rpm
+          ls -la target/generate-rpm/
+
+      - name: Package tar.gz
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          tar czf "clipchamp-${VERSION}-linux-x86_64.tar.gz" -C target/release clipchamp
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipchamp-linux-x86_64-rpm
+          path: target/generate-rpm/*.rpm
+
+      - name: Upload tar.gz artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipchamp-linux-x86_64-tar
+          path: clipchamp-*.tar.gz
+
+  build-macos:
+    name: Build macOS (${{ matrix.target }})
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            runner: macos-13
+          - target: aarch64-apple-darwin
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GTK3
+        run: brew install gtk+3 pkg-config
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Sync VERSION to Cargo.toml
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }} --features gui
+
+      - name: Package artifact
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          ARCHIVE="clipchamp-${VERSION}-macos-${{ matrix.target }}.tar.gz"
+          tar czf "$ARCHIVE" -C "target/${{ matrix.target }}/release" clipchamp
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipchamp-macos-${{ matrix.target }}
+          path: clipchamp-*.tar.gz
+
+  build-windows:
+    name: Build Windows (x86_64)
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk3
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-rust
+
+      - name: Sync VERSION to Cargo.toml
+        shell: msys2 {0}
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+
+      - name: Build release binary
+        shell: msys2 {0}
+        run: cargo build --release --features gui
+
+      - name: Bundle DLLs and package
+        shell: msys2 {0}
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          mkdir -p dist
+
+          cp target/release/clipchamp.exe dist/
+
+          # Copy all required DLLs from UCRT64
+          ldd dist/clipchamp.exe | grep ucrt64 | awk '{print $3}' | while read -r dll; do
+            cp "$dll" dist/
+          done
+
+          # Copy GDK pixbuf loaders
+          mkdir -p dist/lib/gdk-pixbuf-2.0
+          cp -r /ucrt64/lib/gdk-pixbuf-2.0/2.10.0 dist/lib/gdk-pixbuf-2.0/
+
+          # Copy and compile GLib schemas
+          mkdir -p dist/share/glib-2.0/schemas
+          cp /ucrt64/share/glib-2.0/schemas/gschemas.compiled dist/share/glib-2.0/schemas/
+
+          # Copy Adwaita icon theme (needed for GTK stock icons)
+          mkdir -p dist/share/icons
+          if [ -d /ucrt64/share/icons/Adwaita ]; then
+            cp -r /ucrt64/share/icons/Adwaita dist/share/icons/
+          fi
+
+          echo "Contents of dist/:"
+          ls -la dist/
+          echo "DLL count: $(find dist -name '*.dll' | wc -l)"
+
+      - name: Create zip
+        shell: msys2 {0}
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          cd dist
+          7z a "../clipchamp-${VERSION}-windows-x86_64.zip" .
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipchamp-windows-x86_64
+          path: clipchamp-*.zip
+
+  create-release:
+    name: Create GitHub Release
+    needs: [check-release, build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release files
+        run: |
+          mkdir release-files
+          find artifacts -type f \( -name "*.rpm" -o -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} release-files/ \;
+          echo "Release files:"
+          ls -la release-files/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.check-release.outputs.version }}"
+          TAG="${{ needs.check-release.outputs.tag }}"
+
+          gh release create "$TAG" \
+            --title "clipchamp $VERSION" \
+            --generate-notes \
+            release-files/*
