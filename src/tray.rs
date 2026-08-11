@@ -105,12 +105,11 @@ pub fn run(
                 if let Err(e) = open::that(&config_path) {
                     tracing::error!("failed to open config: {e}");
                 }
-            } else if event.id() == &open_log_id {
-                if let Some(ref path) = log_file {
-                    if let Err(e) = open_log_in_terminal(path) {
-                        tracing::error!("failed to open log monitor: {e}");
-                    }
-                }
+            } else if event.id() == &open_log_id
+                && let Some(ref path) = log_file
+                && let Err(e) = open_log_in_terminal(path)
+            {
+                tracing::error!("failed to open log monitor: {e}");
             }
         }
 

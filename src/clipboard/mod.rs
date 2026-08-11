@@ -19,16 +19,11 @@ pub struct ClipboardHandle {
 
 pub trait ClipboardWriter: Send {
     fn write(&mut self, content: &ClipboardContent) -> Result<()>;
-    fn read(&mut self) -> Result<Option<ClipboardContent>>;
 }
 
 impl ClipboardHandle {
     pub fn write(&mut self, content: &ClipboardContent) -> Result<()> {
         self.writer.write(content)
-    }
-
-    pub fn read(&mut self) -> Result<Option<ClipboardContent>> {
-        self.writer.read()
     }
 }
 
@@ -69,27 +64,6 @@ pub fn create_writer(last_written_hash: std::sync::Arc<std::sync::Mutex<Option<[
     {
         let _ = last_written_hash;
         anyhow::bail!("unsupported platform");
-    }
-}
-
-pub fn text_content(s: &str) -> ClipboardContent {
-    ClipboardContent {
-        content_type: ContentType::Text,
-        data: s.as_bytes().to_vec(),
-    }
-}
-
-pub fn url_content(s: &str) -> ClipboardContent {
-    ClipboardContent {
-        content_type: ContentType::Url,
-        data: s.as_bytes().to_vec(),
-    }
-}
-
-pub fn image_content(png_data: Vec<u8>) -> ClipboardContent {
-    ClipboardContent {
-        content_type: ContentType::Image,
-        data: png_data,
     }
 }
 

@@ -91,21 +91,20 @@ fn init_tracing(logging: &config::LoggingConfig) -> anyhow::Result<()> {
     let stdout_layer = fmt::layer();
 
     let file_layer = logging.file.as_ref().and_then(|log_path| {
-        if let Some(parent) = log_path.parent() {
-            if !parent.as_os_str().is_empty() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    eprintln!(
-                        "Warning: could not create log directory {}: {}\n  \
-                         To fix: sudo mkdir -p {} && sudo chmod 1777 {}\n  \
-                         File logging disabled.",
-                        parent.display(),
-                        e,
-                        parent.display(),
-                        parent.display()
-                    );
-                    return None;
-                }
-            }
+        if let Some(parent) = log_path.parent()
+            && !parent.as_os_str().is_empty()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            eprintln!(
+                "Warning: could not create log directory {}: {}\n  \
+                 To fix: sudo mkdir -p {} && sudo chmod 1777 {}\n  \
+                 File logging disabled.",
+                parent.display(),
+                e,
+                parent.display(),
+                parent.display()
+            );
+            return None;
         }
 
         let dir = log_path.parent().unwrap_or(Path::new("."));

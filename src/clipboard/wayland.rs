@@ -34,45 +34,6 @@ impl ClipboardWriter for WaylandClipboardWriter {
         }
         Ok(())
     }
-
-    fn read(&mut self) -> Result<Option<ClipboardContent>> {
-        if let Ok(text) = self.clipboard.get_text() {
-            if !text.is_empty() {
-                let content_type = if text.starts_with("http://") || text.starts_with("https://") {
-                    ContentType::Url
-                } else {
-                    ContentType::Text
-                };
-                return Ok(Some(ClipboardContent {
-                    content_type,
-                    data: text.into_bytes(),
-                }));
-            }
-        }
-        if let Ok(img) = self.clipboard.get_image() {
-            let rgba_image = image::RgbaImage::from_raw(
-                img.width as u32,
-                img.height as u32,
-                img.bytes.to_vec(),
-            );
-            if let Some(rgba) = rgba_image {
-                let mut png_buf = Vec::new();
-                let encoder = image::codecs::png::PngEncoder::new(&mut png_buf);
-                image::ImageEncoder::write_image(
-                    encoder,
-                    &rgba,
-                    rgba.width(),
-                    rgba.height(),
-                    image::ExtendedColorType::Rgba8,
-                )?;
-                return Ok(Some(ClipboardContent {
-                    content_type: ContentType::Image,
-                    data: png_buf,
-                }));
-            }
-        }
-        Ok(None)
-    }
 }
 
 pub fn create(poll_interval_ms: u64) -> Result<ClipboardHandle> {

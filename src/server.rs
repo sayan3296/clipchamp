@@ -285,16 +285,16 @@ async fn handle_client(
             Message::HistoryFetch { hash } => {
                 let hist = history.lock().await;
                 let clients = clients.lock().await;
-                if let Some(handle) = clients.get(&client_id) {
-                    if let Some(entry) = hist.get_by_hash(&hash) {
-                        let _ = handle
-                            .tx
-                            .send(Message::HistoryContent {
-                                content_type: entry.content_type,
-                                data: entry.data.clone(),
-                            })
-                            .await;
-                    }
+                if let Some(handle) = clients.get(&client_id)
+                    && let Some(entry) = hist.get_by_hash(&hash)
+                {
+                    let _ = handle
+                        .tx
+                        .send(Message::HistoryContent {
+                            content_type: entry.content_type,
+                            data: entry.data.clone(),
+                        })
+                        .await;
                 }
             }
             Message::HistoryClear => {

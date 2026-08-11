@@ -70,11 +70,10 @@ impl HistoryStore {
         hash: [u8; 32],
         origin_client: Uuid,
     ) -> Result<()> {
-        // Dedup: skip if last entry has same hash
-        if let Some(last) = self.entries.back() {
-            if last.hash == hash {
-                return Ok(());
-            }
+        if let Some(last) = self.entries.back()
+            && last.hash == hash
+        {
+            return Ok(());
         }
 
         let timestamp_secs = SystemTime::now()
