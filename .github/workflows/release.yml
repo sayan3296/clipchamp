@@ -17,6 +17,7 @@ jobs:
     outputs:
       should_release: ${{ steps.decide.outputs.should_release }}
       version: ${{ steps.decide.outputs.version }}
+      cargo_version: ${{ steps.decide.outputs.cargo_version }}
       tag: ${{ steps.decide.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
@@ -58,9 +59,16 @@ jobs:
             exit 0
           fi
 
-          echo "New release $TAG will be created."
+          # Cargo requires semver x.y.z; append .0 if VERSION is x.y
+          CARGO_VERSION="$VERSION"
+          if [[ "$CARGO_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            CARGO_VERSION="${CARGO_VERSION}.0"
+          fi
+
+          echo "New release $TAG will be created (cargo version: $CARGO_VERSION)."
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=$CARGO_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   build-linux:
@@ -83,9 +91,9 @@ jobs:
 
       - name: Sync VERSION to Cargo.toml
         run: |
-          VERSION="${{ needs.check-release.outputs.version }}"
-          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
-          echo "Cargo.toml version set to $VERSION"
+          CARGO_VERSION="${{ needs.check-release.outputs.cargo_version }}"
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" Cargo.toml
+          echo "Cargo.toml version set to $CARGO_VERSION"
           head -5 Cargo.toml
 
       - name: Build release binary
@@ -148,8 +156,8 @@ jobs:
 
       - name: Sync VERSION to Cargo.toml
         run: |
-          VERSION="${{ needs.check-release.outputs.version }}"
-          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          CARGO_VERSION="${{ needs.check-release.outputs.cargo_version }}"
+          sed -i '' "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" Cargo.toml
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} --features gui
@@ -187,8 +195,8 @@ jobs:
       - name: Sync VERSION to Cargo.toml
         shell: msys2 {0}
         run: |
-          VERSION="${{ needs.check-release.outputs.version }}"
-          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          CARGO_VERSION="${{ needs.check-release.outputs.cargo_version }}"
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" Cargo.toml
 
       - name: Build release binary
         shell: msys2 {0}
