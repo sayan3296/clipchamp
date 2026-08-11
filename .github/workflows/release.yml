@@ -234,12 +234,10 @@ jobs:
           echo "DLL count: $(find dist -name '*.dll' | wc -l)"
 
       - name: Create zip
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          VERSION="${{ needs.check-release.outputs.version }}"
-          cd dist
-          7z a "../clipchamp-${VERSION}-windows-x86_64.zip" .
-          cd ..
+          $VERSION = "${{ needs.check-release.outputs.version }}"
+          Compress-Archive -Path dist\* -DestinationPath "clipchamp-${VERSION}-windows-x86_64.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

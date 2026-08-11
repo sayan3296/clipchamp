@@ -14,33 +14,44 @@ A single Rust binary that syncs clipboard content (text, images, URLs) across Li
 - Optional TLS and system tray icon (feature flags)
 - Configurable file logging with log levels
 
-## Requirements
+## Installation
 
-- [Rust](https://www.rust-lang.org/tools/install) 1.85+ (edition 2024)
+### Pre-built Binaries
 
-**Linux / macOS:**
+Download the latest release from [GitHub Releases](../../releases).
+
+**Linux (Fedora/RHEL):**
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sudo dnf install ./clipchamp-*-1.x86_64.rpm
 ```
 
-**Windows:** Download and run the installer from [rustup.rs](https://rustup.rs).
+**macOS:**
 
-### Platform Dependencies
+```sh
+# Choose the archive matching your architecture (x86_64 or aarch64)
+tar xzf clipchamp-*-macos-*.tar.gz
+sudo mv clipchamp /usr/local/bin/
+# Tray feature requires GTK3: brew install gtk+3
+```
 
-| Platform | Requirement | Notes |
-|----------|-------------|-------|
-| Linux | `wl-clipboard` | Runtime clipboard access on Wayland |
-| macOS | Xcode Command Line Tools | `xcode-select --install` |
-| Windows | MSVC Build Tools | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
+**Windows:**
 
-See [DEVEL.md](DEVEL.md) for additional dependencies when building with optional features (`--features gui`, `--features tls`).
+Extract `clipchamp-*-windows-x86_64.zip` to a folder and run `clipchamp.exe`. GTK3 DLLs are bundled.
+
+### Build from Source
+
+Requires [Rust](https://www.rust-lang.org/tools/install) 1.85+ (edition 2024).
+
+```sh
+cargo install --path .
+```
+
+See [DEVEL.md](DEVEL.md) for feature flags (`--features gui`, `--features tls`) and platform-specific build dependencies.
 
 ## Quick Start
 
 ```sh
-cargo install --path .
-
 # Start the server
 clipchamp server
 
