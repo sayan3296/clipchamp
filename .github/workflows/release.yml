@@ -27,9 +27,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Default to no release
-          echo "should_release=false" >> "$GITHUB_OUTPUT"
-
           # Check commit message
           MSG=$(git log -1 --pretty=%s)
           if [[ "$MSG" != "Release the newest version" ]]; then
@@ -216,16 +213,20 @@ jobs:
           done
 
           # Copy GDK pixbuf loaders
-          mkdir -p dist/lib/gdk-pixbuf-2.0
-          cp -r /ucrt64/lib/gdk-pixbuf-2.0/2.10.0 dist/lib/gdk-pixbuf-2.0/
+          if [ -d /ucrt64/lib/gdk-pixbuf-2.0 ]; then
+            mkdir -p dist/lib/gdk-pixbuf-2.0
+            cp -r /ucrt64/lib/gdk-pixbuf-2.0/* dist/lib/gdk-pixbuf-2.0/
+          fi
 
-          # Copy and compile GLib schemas
-          mkdir -p dist/share/glib-2.0/schemas
-          cp /ucrt64/share/glib-2.0/schemas/gschemas.compiled dist/share/glib-2.0/schemas/
+          # Copy GLib compiled schemas
+          if [ -f /ucrt64/share/glib-2.0/schemas/gschemas.compiled ]; then
+            mkdir -p dist/share/glib-2.0/schemas
+            cp /ucrt64/share/glib-2.0/schemas/gschemas.compiled dist/share/glib-2.0/schemas/
+          fi
 
           # Copy Adwaita icon theme (needed for GTK stock icons)
-          mkdir -p dist/share/icons
           if [ -d /ucrt64/share/icons/Adwaita ]; then
+            mkdir -p dist/share/icons
             cp -r /ucrt64/share/icons/Adwaita dist/share/icons/
           fi
 
